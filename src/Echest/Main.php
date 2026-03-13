@@ -9,10 +9,10 @@ use pocketmine\command\CommandSender;
 use pocketmine\player\Player;
 use pocketmine\Server;
 use pocketmine\utils\Config;
-use pocketmine\nbt\BigEndianNbtSerializer;
-use pocketmine\nbt\TreeRoot;
 use pocketmine\inventory\SimpleInventory;
 use pocketmine\item\Item;
+use pocketmine\nbt\BigEndianNbtSerializer;
+use pocketmine\nbt\TreeRoot;
 use pocketmine\event\inventory\InventoryCloseEvent;
 
 class Main extends PluginBase implements Listener{
@@ -32,22 +32,23 @@ class Main extends PluginBase implements Listener{
         $msg = $messages[$key] ?? "";
         $prefix = $messages["prefix"] ?? "";
 
-        $msg = str_replace("{prefix}", $prefix, $msg);
+        $msg = str_replace("{prefix}",$prefix,$msg);
 
-        foreach($replace as $k => $v){
-            $msg = str_replace("{".$k."}", $v, $msg);
+        foreach($replace as $k=>$v){
+            $msg = str_replace("{".$k."}",$v,$msg);
         }
 
         return $msg;
     }
 
-    private function findPlayerPartial(string $name): ?Player{
-        foreach(Server::getInstance()->getOnlinePlayers() as $player){
-            if(stripos($player->getName(), $name) !== false){
-                return $player;
-            }
-        }
-        return null;
+    private function openVirtualChest(Player $player, array $contents): SimpleInventory{
+
+        $inv = new SimpleInventory(27);
+        $inv->setContents($contents);
+
+        $player->setCurrentWindow($inv);
+
+        return $inv;
     }
 
     public function onCommand(CommandSender $sender, Command $command, string $label, array $args): bool{
@@ -58,8 +59,16 @@ class Main extends PluginBase implements Listener{
         }
 
         if(!isset($args[0])){
+
             $sender->sendMessage($this->msg("opening-own"));
-            $sender->setCurrentWindow($sender->getEnderInventory());
+
+            $inv = $this->openVirtualChest($sender,$sender->getEnderInventory()->getContents());
+
+            $this->editing[$sender->getName()] = [
+                "self" => true,
+                "inventory" => $inv
+            ];
+
             return true;
         }
 
@@ -68,7 +77,7 @@ class Main extends PluginBase implements Listener{
             return true;
         }
 
-        $target = $this->findPlayerPartial($args[0]);
+        $target = Server::getInstance()->getPlayerByPrefix($args[0]);
 
         if($target instanceof Player){
 
@@ -76,7 +85,13 @@ class Main extends PluginBase implements Listener{
                 "player"=>$target->getName()
             ]));
 
-            $sender->setCurrentWindow($target->getEnderInventory());
+            $inv = $this->openVirtualChest($sender,$target->getEnderInventory()->getContents());
+
+            $this->editing[$sender->getName()] = [
+                "online"=>$target,
+                "inventory"=>$inv
+            ];
+
             return true;
         }
 
@@ -90,37 +105,30 @@ class Main extends PluginBase implements Listener{
         $uuid = $offline->getUniqueId()->toString();
         $file = $this->getServer()->getDataPath()."playerdata/".$uuid.".dat";
 
-        if(!file_exists($file)){
-            $sender->sendMessage($this->msg("player-not-found"));
-            return true;
-        }
-
         $serializer = new BigEndianNbtSerializer();
         $nbt = $serializer->read(file_get_contents($file))->mustGetCompoundTag();
 
-        $inventory = new SimpleInventory(27);
+        $inventory = [];
 
         if($nbt->getTag("EnderChestInventory") !== null){
 
             foreach($nbt->getListTag("EnderChestInventory") as $itemNBT){
 
-                $inventory->setItem(
-                    $itemNBT->getByte("Slot"),
-                    Item::nbtDeserialize($itemNBT)
-                );
+                $inventory[$itemNBT->getByte("Slot")] = Item::nbtDeserialize($itemNBT);
+
             }
         }
 
-        $sender->setCurrentWindow($inventory);
+        $sender->sendMessage($this->msg("viewing-player",[
+            "player"=>$offline->getName()
+        ]));
+
+        $inv = $this->openVirtualChest($sender,$inventory);
 
         $this->editing[$sender->getName()] = [
             "file"=>$file,
-            "inventory"=>$inventory
+            "inventory"=>$inv
         ];
-
-        $sender->sendMessage($this->msg("offline-loaded",[
-            "player"=>$offline->getName()
-        ]));
 
         return true;
     }
@@ -134,24 +142,35 @@ class Main extends PluginBase implements Listener{
         }
 
         $data = $this->editing[$player->getName()];
-        $inventory = $data["inventory"];
-        $file = $data["file"];
+        $inv = $data["inventory"];
 
-        $serializer = new BigEndianNbtSerializer();
-        $nbt = $serializer->read(file_get_contents($file))->mustGetCompoundTag();
+        if(isset($data["self"])){
 
-        $items = [];
+            $player->getEnderInventory()->setContents($inv->getContents());
 
-        foreach($inventory->getContents() as $slot=>$item){
+        }elseif(isset($data["online"])){
 
-            $tag = $item->nbtSerialize();
-            $tag->setByte("Slot",$slot);
-            $items[] = $tag;
+            $data["online"]->getEnderInventory()->setContents($inv->getContents());
+
+        }elseif(isset($data["file"])){
+
+            $serializer = new BigEndianNbtSerializer();
+            $nbt = $serializer->read(file_get_contents($data["file"]))->mustGetCompoundTag();
+
+            $items = [];
+
+            foreach($inv->getContents() as $slot=>$item){
+
+                $tag = $item->nbtSerialize();
+                $tag->setByte("Slot",$slot);
+                $items[] = $tag;
+
+            }
+
+            $nbt->setTag("EnderChestInventory",$items);
+
+            file_put_contents($data["file"],$serializer->write(new TreeRoot($nbt)));
         }
-
-        $nbt->setTag("EnderChestInventory",$items);
-
-        file_put_contents($file,$serializer->write(new TreeRoot($nbt)));
 
         unset($this->editing[$player->getName()]);
 
