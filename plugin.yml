@@ -1,0 +1,17 @@
+name: Echest
+main: Echest\Main
+version: 1.0.0
+api: 5.0.0
+author: ZyberPE
+
+commands:
+  echest:
+    description: Open your EnderChest
+    usage: "/echest [player]"
+    permission: echest.use
+
+permissions:
+  echest.use:
+    default: true
+  echest.other:
+    default: op
