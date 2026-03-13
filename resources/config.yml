@@ -2,18 +2,14 @@ messages:
 
   prefix: "§8[§bEchest§8] "
 
-  player-only: "{prefix}§cUse this command in-game."
+  player-only: "{prefix}§cRun this command in-game."
 
-  no-permission: "{prefix}§cYou don't have permission."
+  no-permission: "{prefix}§cYou do not have permission."
 
-  usage: "{prefix}§7Usage: §f/echest [player]"
+  opening-own: "{prefix}§aOpening your EnderChest..."
 
-  opening-own: "{prefix}§aOpening your Ender Chest..."
-
-  viewing-player: "{prefix}§aViewing §e{player}§a's Ender Chest."
+  viewing-player: "{prefix}§aViewing §e{player}§a's EnderChest."
 
   player-not-found: "{prefix}§cPlayer not found."
-
-  offline-loaded: "{prefix}§aLoaded offline EnderChest for §e{player}"
 
   saved: "{prefix}§aEnderChest saved."
