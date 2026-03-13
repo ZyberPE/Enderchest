@@ -4,7 +4,7 @@ messages:
 
   player-only: "{prefix}§cRun this command in-game."
 
-  no-permission: "{prefix}§cYou do not have permission."
+  no-permission: "{prefix}§cYou don't have permission."
 
   opening-own: "{prefix}§aOpening your EnderChest..."
 
